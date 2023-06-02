@@ -11,19 +11,35 @@ import 'package:flutter_tex/src/utils/fake_ui.dart'
 
 class TeXViewState extends State<TeXView> {
   String? _lastData;
-  double widgetHeight = minHeight;
+  final ValueNotifier<double> _height = ValueNotifier<double>(minHeight);
   final String _viewId = UniqueKey().toString();
 
   @override
   Widget build(BuildContext context) {
     _initTeXView();
-    return SizedBox(
-      height: widgetHeight,
-      child: HtmlElementView(
-        key: widget.key ?? ValueKey(_viewId),
-        viewType: _viewId,
-      ),
-    );
+    return ValueListenableBuilder<double>(
+        valueListenable: _height,
+        builder: (context, value, _) {
+          return Stack(
+            children: [
+              SizedBox(
+                height: _height.value,
+                child: HtmlElementView(
+                  key: widget.key ?? ValueKey(_viewId),
+                  viewType: _viewId,
+                ),
+              ),
+              Visibility(
+                  visible: widget.loadingWidgetBuilder?.call(context) != null
+                      ? _height.value == minHeight
+                          ? true
+                          : false
+                      : false,
+                  child: widget.loadingWidgetBuilder?.call(context) ??
+                      const SizedBox.shrink())
+            ],
+          );
+        });
   }
 
   @override
@@ -44,12 +60,12 @@ class TeXViewState extends State<TeXView> {
           ..style.border = '0');
 
     js.context['TeXViewRenderedCallback'] = (message) {
-      double viewHeight = double.parse(message.toString());
-      if (viewHeight != widgetHeight) {
-        setState(() {
-          widgetHeight = viewHeight;
-        });
+      double height = double.parse(message.toString());
+      if (_height.value != height) {
+        _height.value = height;
       }
+
+      widget.onRenderFinished?.call(height);
     };
 
     js.context['OnTapCallback'] = (id) {
